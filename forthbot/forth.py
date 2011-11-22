@@ -2,7 +2,10 @@
 #
 #   f o r t h . p y
 #
-import sys, re
+
+import sys, re, shlex
+
+
 
 ds       = []          # The data stack
 cStack   = []          # The control struct stack
@@ -30,8 +33,10 @@ def getWord (prompt="... ") :
     return word
 
 def tokenizeWords(s) :
-    global words                                          # clip comments, split to list of words
-    words += re.sub("#.*\n","\n",s+"\n").lower().split()  # Use "#" for comment to end of line
+    global words 
+    # clip comments, split to list of words
+    words += shlex.split(s, True)
+    #words += re.sub("#.*\n","\n",s+"\n").lower().split()  # Use "#" for comment to end of line
 
 #================================= Runtime operation
 
