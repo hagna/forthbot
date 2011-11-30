@@ -6,6 +6,33 @@ from subprocess import Popen, PIPE
 from twisted.python import procutils
 from twisted.python.filepath import FilePath
 
+
+
+def _runforth(s):
+    forthproc = forth.__file__
+    p = procutils.which('python')[0]
+    p2 = Popen([p, forthproc], stdin=PIPE, stdout=PIPE)
+    output = p2.communicate(input=s)[0]
+    return output
+
+
+class ImprovedForth(TestCase):
+    def setUp(self):
+        pass
+
+    def test_append_strings(self):
+        i = '"abc" "def" + .'
+        c = 'abcdef'
+        o = _runforth(i)
+        self.assertTrue(c in o, "%s did not contain %s" % (o, c))
+
+    def test_append_lists(self):
+        i = '[1, 2, 3] [4, 5, 6] + .'
+        o = _runforth(i)
+        e = '[1, 2, 3, 4, 5, 6]'
+        self.assertTrue(e in o, "%s did not contain %s" % (o, e))
+
+
 class TestForth(TestCase):
     def setUp(self):
         forth.words = []
@@ -15,15 +42,15 @@ class TestForth(TestCase):
 
     def test_tokenizeWords(self):
         tokenizeWords('a b c d e 1 2 34')
-        self.assertEquals(forth.words, ['a', 'b', 'c', 'd', 'e', '1', '2', '34'])
+        self.assertEquals(forth.words, ['a', 'b', 'c', 'd', 'e', 1, 2, 34])
 
     def test_tokenizeWords_comments(self):
         tokenizeWords('a b c d e 1 2 # 34')
-        self.assertEquals(forth.words, ['a', 'b', 'c', 'd', 'e', '1', '2'])
+        self.assertEquals(forth.words, ['a', 'b', 'c', 'd', 'e', 1, 2])
 
     def test_tokenizeWords_strings(self):
-        tokenizeWords('"nate test" "this" "out" 1 2')
-        self.assertEquals(forth.words, ['nate test', 'this', 'out', '1', '2'])
+        tokenizeWords('"nate test" "this" \'out\' 1 2')
+        self.assertEquals(forth.words, ['"nate test"', '"this"', "'out'", 1, 2])
 
 
 class TestDoc(TestCase):
@@ -40,11 +67,7 @@ class TestDoc(TestCase):
 
 
     def _runforth(self, s):
-        forthproc = forth.__file__
-        p = procutils.which('python')[0]
-        p2 = Popen([p, forthproc], stdin=PIPE, stdout=PIPE)
-        output = p2.communicate(input=s)[0]
-        return output
+        return _runforth(s)
 
     def _cmpforth(self, p, output):
         z = self._runforth(p)

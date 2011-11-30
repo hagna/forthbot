@@ -3,7 +3,9 @@
 #   f o r t h . p y
 #
 
-import sys, re, shlex
+import sys, re, string
+from parsePythonValue import listItem
+from pyparsing import OneOrMore, Word, pythonStyleComment
 
 
 
@@ -32,11 +34,18 @@ def getWord (prompt="... ") :
     words = words[1:]
     return word
 
+punctuation = string.punctuation
+punctuation.replace('#', '')
+punctuation.replace('"', '')
+
+I = Word(string.letters + punctuation + string.digits) 
+D = listItem | I 
+S = OneOrMore(D).ignore(pythonStyleComment)
+
 def tokenizeWords(s) :
     global words 
     # clip comments, split to list of words
-    words += shlex.split(s, True)
-    #words += re.sub("#.*\n","\n",s+"\n").lower().split()  # Use "#" for comment to end of line
+    words = S.parseString(s).asList()
 
 #================================= Runtime operation
 
@@ -97,13 +106,17 @@ rDict = {
 }
 #================================= Compile time 
 
+
 def compile() :
     pcode = []; prompt = "Forth> "
     while 1 :
         word = getWord(prompt)  # get next word
         if word == None : return None
-        cAct = cDict.get(word)  # Is there a compile time action ?
-        rAct = rDict.get(word)  # Is there a runtime action ?
+        cAct = None
+        rAct = None
+        if type(word) not in [type(['list'])]:
+            cAct = cDict.get(word)  # Is there a compile time action ?
+            rAct = rDict.get(word)  # Is there a runtime action ?
 
         if cAct : cAct(pcode)   # run at compile time
         elif rAct :
@@ -118,8 +131,15 @@ def compile() :
             except :
                 try: pcode.append(float(word))
                 except : 
-                    pcode[-1] = rRun     # Change rPush to rRun
-                    pcode.append(word)   # Assume word will be defined
+                    if type(word) == type(['list']):
+                        pcode.append(word)
+                    if type(word) == type("string"):
+                        c = word[0]
+                        if c == '"' or c == "'":
+                            pcode.append(word[1:-1])
+                        else:
+                            pcode[-1] = rRun     # Change rPush to rRun
+                            pcode.append(word)   # Assume word will be defined
         if not cStack : return pcode
         prompt = "...    "
     
