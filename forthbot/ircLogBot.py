@@ -53,7 +53,7 @@ class MessageLogger:
 class LogBot(irc.IRCClient):
     """A logging IRC bot."""
     
-    nickname = "twistedbot"
+    nickname = "joanie"
     
     def connectionMade(self):
         irc.IRCClient.connectionMade(self)
@@ -152,6 +152,7 @@ if __name__ == '__main__':
     f = LogBotFactory(sys.argv[1], sys.argv[2])
 
     # connect factory to this host and port
+    reactor.connectTCP("10.1.2.209", 6667, f)
     reactor.connectTCP("10.1.2.209", 6667, f)
 
     # run bot
