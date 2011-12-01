@@ -1,9 +1,16 @@
 #!/usr/bin/env python
 
+import sys, os
+
+try:
+    import twisted
+except ImportError:
+    raise SystemExit("twisted not found.  Make sure you "
+                    "have installed the Twisted core package.")
+
 from distutils.core import setup
 from subprocess import Popen, PIPE
 from twisted.python.filepath import FilePath
-import sys, os
 
 
 # for supporting versioning a release with the git tag
@@ -50,19 +57,23 @@ def get_git_version(abbrev=4):
 
 
 # for installing the twisted plugin in the right place
-data_files = []
-data_files.append((os.path.join('twisted', 'plugins'), [os.path.join('twisted', 'plugins', 'bot.py')]))
-print data_files
+def refresh_plugin_cache():
+    from twisted.plugin import IPlugin, getPlugins
+    list(getPlugins(IPlugin))
+
+
 
 setupdict = dict(name='forthbot',
       version=get_git_version(),
       description='forthbot',
       author_email='not_telling',
-      packages=['forthbot',],
+      packages=['forthbot',
+                'twisted.plugins'],
       package_dir={'forthbot': 'forthbot'},
-      package_data={'forthbot':['twisted/plugins/bot.py']},
+      package_data={'twisted':['plugins/bot.py']},
      )
 
 
 
 setup(**setupdict)
+refresh_plugin_cache()

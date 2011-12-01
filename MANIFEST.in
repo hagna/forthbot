@@ -1,1 +1,2 @@
 recursive-include forthbot *.py
+graft twisted

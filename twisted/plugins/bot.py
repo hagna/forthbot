@@ -12,6 +12,7 @@ from twisted.application.service import IServiceMaker
 from twisted.application.internet import TCPClient
 from twisted.plugin import IPlugin
 from twisted.python.usage import Options, portCoerce
+from forthbot.version import __version__
 
 class _IrcBotPlugin(object):
     """
@@ -29,7 +30,7 @@ class _IrcBotPlugin(object):
 			('channel', 'c', 'test', 'channel to join'),
              ]
 
-    description = "ircbot log bot"
+    description = "ircbot log bot version: %s" % __version__
 
     tapname = "ircbot"
 
