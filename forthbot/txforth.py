@@ -57,9 +57,9 @@ class Forth(basic.LineReceiver):
     def rGt  (self, cod,p) : b=self.ds.pop(); a=self.ds.pop(); self.ds.append(int(a>b))
     def rLt  (self, cod,p) : b=self.ds.pop(); a=self.ds.pop(); self.ds.append(int(a<b))
     def rSwap(self, cod,p) : a=self.ds.pop(); b=self.ds.pop(); self.ds.append(a); self.ds.append(b)
-    def rDup (self, cod,p) : self.ds.append(ds[-1])
+    def rDup (self, cod,p) : self.ds.append(self.ds[-1])
     def rDrop(self, cod,p) : self.ds.pop()
-    def rOver(self, cod,p) : self.ds.append(ds[-2])
+    def rOver(self, cod,p) : self.ds.append(self.ds[-2])
     def rDump(self, cod,p) : self.sendLine("ds = "+ str(self.ds))
     def rDot (self, cod,p) : self.sendLine(str(self.ds.pop()))
     def rJmp (self, cod,p) : return cod[p]
@@ -69,8 +69,14 @@ class Forth(basic.LineReceiver):
     def rPush(self, cod,p) : self.ds.append(cod[p])     ; return p+1
 
     def rCreate (self, pcode,p) :
-        self.lastCreate = label = self.getWord()      # match next word (input) to next heap address
+        print "changing state to create"
+        self.state = 'create'
+
+    def state_create(self, label):
+        print "in state_create"
+        self.lastCreate = label       # match next word (input) to next heap address
         self.rDict[label] = [self.rPush, self.heapNext]    # when created word is run, pushes its address
+        self.execute(self.pcode)
 
     def rDoes (self, cod,p) :
         self.rDict[self.lastCreate] += cod[p:]        # rest of words belong to created words runtime
@@ -111,11 +117,11 @@ class Forth(basic.LineReceiver):
         if not self.cStack : fatal("No BEGIN for UNTIL to match")
         code,slot = self.cStack.pop()
         if code != "BEGIN" : fatal("UNTIL preceded by %s (not BEGIN)" % code)
-        pcode.append(rJz)
+        pcode.append(self.rJz)
         pcode.append(slot)
 
     def cIf (self, pcode) :
-        pcode.append(rJz)
+        pcode.append(self.rJz)
         self.cStack.append(("IF",len(pcode)))  # flag for following Then or Else
         pcode.append(0)                   # slot to be filled in
 
@@ -123,7 +129,7 @@ class Forth(basic.LineReceiver):
         if not self.cStack : fatal("No IF for ELSE to match")
         code,slot = self.cStack.pop()
         if code != "IF" : fatal("ELSE preceded by %s (not IF)" % code)
-        pcode.append(rJmp)
+        pcode.append(self.rJmp)
         self.cStack.append(("ELSE",len(pcode)))  # flag for following THEN
         pcode.append(0)                     # slot to be filled in
         pcode[slot] = len(pcode)            # close JZ for IF
@@ -146,7 +152,10 @@ class Forth(basic.LineReceiver):
     def lineReceived(self, line):
         """
         """
-        if line[0:1] == "@" : line = open(line[1:-1]).read()
+        if line[0:1] == "@" : 
+            lines = open(line[1:]).read()
+            for line in lines:
+                self.lineReceived(line)
         else:
             self.words = self.words + self.S.parseString(line).asList()
             while self.words:
@@ -159,6 +168,7 @@ class Forth(basic.LineReceiver):
 
 
     def wordReceived(self, word):
+        print "doing word", word
         try:
             pto = 'state_'+self.state
             statehandler = getattr(self,pto)
@@ -193,15 +203,15 @@ class Forth(basic.LineReceiver):
             self.do_rAct(rAct, word)
 
         else:
+            self.pcode.append(self.rPush)
             res = self.fix_type(word)
             if res is None:
                 self.pcode[-1] = self.rRun # change push to run
                 self.pcode.append(word) # assume the word will be defined
             else:
-                self.pcode.append(self.rPush)
                 self.pcode.append(res)
         if self.cStack == []:
-            self.execute(self.pcode)
+            v = self.execute(self.pcode)
             return 'init'
         return 'compile'
 
@@ -218,6 +228,7 @@ class Forth(basic.LineReceiver):
 
 
     def execute (self, code) :
+        print code
         p = 0
         while p < len(code) :
             func = code[p]

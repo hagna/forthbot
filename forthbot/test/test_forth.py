@@ -57,9 +57,13 @@ class TestDoc(TestCase):
     """
     A few test cases from http://openbookproject.net/py4fun/forth/forth.html
     """
+    def fakeSendLine(self, s):
+        self.sentLines.append(s)
+
     def setUp(self):
-        forth.words = []
-        dot = []
+        self.f = forth.Forth()
+        self.f.sendLine = self.fakeSendLine
+        self.sentLines = []
 
     def tearDown(self):
         forth.words = []
@@ -67,77 +71,48 @@ class TestDoc(TestCase):
 
 
     def _runforth(self, s):
-        return _runforth(s)
-
-    def _cmpforth(self, p, output):
-        z = self._runforth(p)
-        s = output.split('\n')
-        for i, line in enumerate(z.split('\n')):
-            self.assertEquals(s[i].strip(), line.strip(), "error on line %d of output" % i)
-
-    def expect_this(self, s):
-        return '''\
-Forth> %s
-Forth> 
-''' % s
-
+        for line in s.split('\n'):
+            self.f.lineReceived(line)
 
     def test_add_mult(self):
         p = '5 6 + 7 8 + * .'
-        g = self.expect_this(165)
-        self._cmpforth(p, g)
+        self._runforth(p)
+        self.assertEquals(self.sentLines[-2], '165')
 
     def test_dump(self):
         p = '5 dump 6 dump + dump 7 dump 8 dump + dump * dump'
-        g = self.expect_this('''\
-ds =  [5]
-ds =  [5, 6]
-ds =  [11]
-ds =  [11, 7]
-ds =  [11, 7, 8]
-ds =  [11, 15]
-ds =  [165]''')
-        self._cmpforth(p, g)
+        self._runforth(p)
+        self.assertEquals(self.sentLines, ['ds = [5]', 'ds = [5, 6]', 'ds = [11]', 'ds = [11, 7]', 'ds = [11, 7, 8]', 'ds = [11, 15]', 'ds = [165]', 'Forth> '])
 
     def test_square_dup(self):
         p = '25 dup * .'
-        g = self.expect_this(625)
-        self._cmpforth(p, g)
+        self._runforth(p)
+        self.assertEquals(self.sentLines[-2], '625')
 
     def test_swap_minus(self):
         p = '42 0 swap - .'
-        g = self.expect_this(-42)
-        self._cmpforth(p, g)
+        self._runforth(p)
+        self.assertEquals(self.sentLines[-2], '-42')
 
     def test_comment(self):
         p = "5 6 + .  # this is a comment"
-        g = self.expect_this(11)
-        self._cmpforth(p, g)
+        self._runforth(p)
+        self.assertEquals(self.sentLines[-2], '11')
 
     def test_newword(self):
         p = ': negate 0 swap - ; 5 negate .'
-        g = '''\
-Forth> -5
-Forth> 
-'''
-        self._cmpforth(p, g)
-
+        self._runforth(p)
+        self.assertEquals(self.sentLines[-2], '-5')
 
     def test_begin_until(self):
         p = '5 begin dup . 1 - dup 0 = until'
-        g = '''\
-Forth> 5
-4
-3
-2
-1
-Forth> 
-'''
-        self._cmpforth(p, g) 
-
+        self._runforth(p)
+        self.assertEquals(self.sentLines,  ['5', '4', '3', '2', '1', 'Forth> '])
 
     def test_load_factorial(self):
         p = "@%s\n 5 fact ." % FilePath(__file__).sibling('fact1.4th').path
+        self._runforth(p)
+        print self.sentLines
         g = '''\
 Forth> ds =  [0, 5, 4, 3, 2, 1]
 ds =  [0, 5, 4, 3, 2]
@@ -181,7 +156,7 @@ ds =  [1307674368000L, 1]
 
     def test_does(self):
         p = ': constant create , does> @ ;\n2009 constant thisYear\nthisYear .'
-        g = "Forth> " * 2 + self.expect_this(2009)
-        self._cmpforth(p, g)
+        self._runforth(p)
+        self.assertEquals(self.sentLines[-2], '2009')
 
 
