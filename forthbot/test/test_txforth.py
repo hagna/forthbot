@@ -5,6 +5,13 @@ from forthbot import forth
 from twisted.python import procutils
 from twisted.python.filepath import FilePath
 
+def _runforth(s):
+    forthproc = forth.__file__
+    p = procutils.which('python')[0]
+    p2 = Popen([p, forthproc], stdin=PIPE, stdout=PIPE)
+    output = p2.communicate(input=s)[0]
+    return output
+
 
 class ImprovedForth(TestCase):
     def setUp(self):
@@ -30,6 +37,16 @@ class TestForth(TestCase):
     def tearDown(self):
         pass
 
+    def test_int_like(self):
+        self.assertEquals(self.f._intlike("123"), True)
+        self.assertEquals(self.f._intlike("12.323"), False)
+
+
+    def test_float_like(self):
+        self.assertEquals(self.f._floatlike("123"), False)
+        self.assertEquals(self.f._floatlike("12.323"), True)
+
+
     def test_tokenizeWords(self):
         self.f.tokenizeWords('a b c d e 1 2 34')
         self.assertEquals(self.f.words, ['a', 'b', 'c', 'd', 'e', 1, 2, 34])
@@ -48,6 +65,7 @@ class TestDoc(TestCase):
     A few test cases from http://openbookproject.net/py4fun/forth/forth.html
     """
     def fakeSendLine(self, s):
+        print s
         self.sentLines.append(s)
 
     def setUp(self):
@@ -59,8 +77,7 @@ class TestDoc(TestCase):
         pass
 
     def _runforth(self, s):
-        for line in s.split('\n'):
-            self.f.lineReceived(line)
+        _runforth(s)
 
     def _cmpforth(self, p, output):
         z = self._runforth(p)
@@ -68,14 +85,22 @@ class TestDoc(TestCase):
         for i, line in enumerate(z.split('\n')):
             self.assertEquals(s[i].strip(), line.strip(), "error on line %d of output" % i)
 
+
     def expect_this(self, s):
-        self.assertEquals(self.sentLines[0], s)
+        return '''\
+Forth> %s
+Forth> 
+''' % s
+
+
+    def expect_this(self, s):
+        self.assertEquals(self.sentLines[-1], s, self.sentLines)
 
     def test_add_mult(self):
         p = '5 6 + 7 8 + * .'
         self._runforth(p)
-        g = self.expect_this(165)
-        self._cmpforth(p, g)
+        self.expect_this(165)
+        print self.f.ds
 
     def test_dump(self):
         p = '5 dump 6 dump + dump 7 dump 8 dump + dump * dump'
@@ -110,7 +135,8 @@ ds =  [165]''')
 Forth> -5
 Forth> 
 '''
-        self._cmpforth(p, g)
+        self._runforth(p)
+        self.expect_this(-5)
 
 
     def test_begin_until(self):

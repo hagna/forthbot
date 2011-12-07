@@ -13,6 +13,7 @@ words    = []          # The input stream of tokens
 def main() :
     while 1 :
         pcode = compile()          # compile/run from user
+        print "after pcode %r ds is %r" % (pcode, ds)
         print pcode
         if pcode == None : print; return
         execute(pcode)

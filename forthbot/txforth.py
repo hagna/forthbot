@@ -1,15 +1,28 @@
 import sys, re, string
 from parsePythonValue import listItem
 from pyparsing import OneOrMore, Word, pythonStyleComment
-from ircLogBot import LogBot
+
+from twisted.protocols import basic
+from twisted.internet import stdio, reactor
 
 
-class Forth:
+COLON = ':'
+SCOLON = ';'
+IF = 'if'
+ELSE = 'else'
+THEN = 'then'
+BEGIN = 'begin'
+UNTIL = 'until'
+
+class Forth(basic.LineReceiver):
     ds = []
     cStack   = []          # The control struct stack
     heap     = [0]*20      # The data heap
     heapNext =  0          # Next avail slot in heap
     words    = []          # The input stream of tokens
+
+    ps = ["Forth> ", "...    "]
+
 
     punctuation = string.punctuation
     punctuation.replace('#', '')
@@ -18,6 +31,8 @@ class Forth:
     I = Word(string.letters + punctuation + string.digits) 
     D = listItem | I 
     S = OneOrMore(D).ignore(pythonStyleComment)
+
+    delimiter = '\n' # unix terminal style newlines. remove this line
 
     def __init__(self):
         self.cDict = {
@@ -46,7 +61,7 @@ class Forth:
     def rDrop(self, cod,p) : self.ds.pop()
     def rOver(self, cod,p) : self.ds.append(ds[-2])
     def rDump(self, cod,p) : self.sendLine("ds = "+ str(self.ds))
-    def rDot (self, cod,p) : self.sendLine(self.ds.pop())
+    def rDot (self, cod,p) : self.sendLine(str(self.ds.pop()))
     def rJmp (self, cod,p) : return cod[p]
     def rJnz (self, cod,p) : return (cod[p],p+1)[self.ds.pop()]
     def rJz  (self, cod,p) : return (p+1,cod[p])[self.ds.pop()==0]
@@ -75,44 +90,47 @@ class Forth:
     def fatal (self, mesg) : raise mesg
 
     def cColon (self, pcode) :
+        return 'colon'
+
+    def state_colon(self, label):
         if self.cStack : fatal(": inside Control stack: %s" % self.cStack)
-        label = self.getWord()
-        cStack.append(("COLON",label))  # flag for following ";"
+        self.cStack.append(("COLON",label))  # flag for following ";"
+        return 'compile'
 
     def cSemi (self, pcode) :
-        if not cStack : fatal("No : for ; to match")
-        code,label = cStack.pop()
+        if not self.cStack : fatal("No : for ; to match")
+        code,label = self.cStack.pop()
         if code != "COLON" : fatal(": not balanced with ;")
-        rDict[label] = pcode[:]       # Save word definition in rDict
+        self.rDict[label] = pcode[:]       # Save word definition in rDict
         while pcode : pcode.pop()
 
     def cBegin (self, pcode) :
-        cStack.append(("BEGIN",len(pcode)))  # flag for following UNTIL
+        self.cStack.append(("BEGIN",len(pcode)))  # flag for following UNTIL
 
     def cUntil (self, pcode) :
-        if not cStack : fatal("No BEGIN for UNTIL to match")
-        code,slot = cStack.pop()
+        if not self.cStack : fatal("No BEGIN for UNTIL to match")
+        code,slot = self.cStack.pop()
         if code != "BEGIN" : fatal("UNTIL preceded by %s (not BEGIN)" % code)
         pcode.append(rJz)
         pcode.append(slot)
 
     def cIf (self, pcode) :
         pcode.append(rJz)
-        cStack.append(("IF",len(pcode)))  # flag for following Then or Else
+        self.cStack.append(("IF",len(pcode)))  # flag for following Then or Else
         pcode.append(0)                   # slot to be filled in
 
     def cElse (self, pcode) :
-        if not cStack : fatal("No IF for ELSE to match")
-        code,slot = cStack.pop()
+        if not self.cStack : fatal("No IF for ELSE to match")
+        code,slot = self.cStack.pop()
         if code != "IF" : fatal("ELSE preceded by %s (not IF)" % code)
         pcode.append(rJmp)
-        cStack.append(("ELSE",len(pcode)))  # flag for following THEN
+        self.cStack.append(("ELSE",len(pcode)))  # flag for following THEN
         pcode.append(0)                     # slot to be filled in
         pcode[slot] = len(pcode)            # close JZ for IF
 
     def cThen (self, pcode) :
-        if not cStack : fatal("No IF or ELSE for THEN to match")
-        code,slot = cStack.pop()
+        if not self.cStack : fatal("No IF or ELSE for THEN to match")
+        code,slot = self.cStack.pop()
         if code not in ("IF","ELSE") : fatal("THEN preceded by %s (not IF or ELSE)" % code)
         pcode[slot] = len(pcode)             # close JZ for IF or JMP for ELSE
 
@@ -121,16 +139,33 @@ class Forth:
 
     state = 'init'
 
-    def lineReceived(self, string):
+
+    def connectionMade(self):
+        self.sendLine(self.ps[0])
+
+    def lineReceived(self, line):
         """
         """
+        if line[0:1] == "@" : line = open(line[1:-1]).read()
+        else:
+            self.words = self.words + self.S.parseString(line).asList()
+            while self.words:
+                word = self.words.pop(0)
+                self.wordReceived(word)
+        if self.state == 'init':
+            self.sendLine(self.ps[0])
+        else:
+            self.sendLine(self.ps[1])
+
+
+    def wordReceived(self, word):
         try:
             pto = 'state_'+self.state
             statehandler = getattr(self,pto)
         except AttributeError:
             log.msg('callback',self.state,'not found')
         else:
-            self.state = statehandler(string)
+            self.state = statehandler(word)
             if self.state == 'done':
                 pass
 
@@ -141,25 +176,45 @@ class Forth:
         self.words = self.S.parseString(s).asList()
 
 
-    def getWord (self, prompt="... ") :
-        try:
-            word = self.words[0]
-            self.words = self.words[1:]
-            return word
-        except:
-            return None
+    def state_init(self, word):
+        self.pcode = []; self.prompt = self.ps[0]
+        return self.state_compile(word)
 
 
-    def state_init(self, line):
-        self.pcode = []; self.prompt = "Forth> "
-        self.sendLine(self.prompt)
-        if line[0:1] == "@" : line = open(line[1:-1]).read()
-        self.tokenizeWords(line)
-        while 1:
-            pcode = self.compile(line)
-            if pcode == None:
-                return 'init'
-            self.execute(pcode)
+    def state_compile(self, word):
+        cAct = self.cDict.get(word, None)
+        rAct = self.rDict.get(word, None)
+        if cAct:
+            z = self.do_cAct(cAct, word)
+            if z is not None:
+                return z
+
+        elif rAct:
+            self.do_rAct(rAct, word)
+
+        else:
+            res = self.fix_type(word)
+            if res is None:
+                self.pcode[-1] = self.rRun # change push to run
+                self.pcode.append(word) # assume the word will be defined
+            else:
+                self.pcode.append(self.rPush)
+                self.pcode.append(res)
+        if self.cStack == []:
+            self.execute(self.pcode)
+            return 'init'
+        return 'compile'
+
+
+    def do_rAct(self, rAct, word):
+        if type(rAct) == type([]) :
+            self.pcode.append(self.rRun)# Compiled word.
+            self.pcode.append(word)     # for now do dynamic lookup
+        else : self.pcode.append(rAct)  # push builtin for runtime
+
+
+    def do_cAct(self, cAct, word):
+        return cAct(self.pcode)
 
 
     def execute (self, code) :
@@ -171,112 +226,37 @@ class Forth:
             if newP != None : p = newP
 
 
-    def compile(self, line):
-        while 1:
-            word = self.getWord(self.prompt)  # get next word
-            print "doing word", word
-            if word == None : return None
-            cAct = None
-            rAct = None
-            if type(word) not in [type(['list'])]:
-                cAct = self.cDict.get(word)  # Is there a compile time action ?
-                rAct = self.rDict.get(word)  # Is there a runtime action ?
+    def _intlike(self, a):
+        try:
+            int(a)
+            return True
+        except:
+            return False
 
-            if cAct : cAct(self.pcode)   # run at compile time
-            elif rAct :
-                if type(rAct) == type([]) :
-                    self.pcode.append(rRun)     # Compiled word.
-                    self.pcode.append(word)     # for now do dynamic lookup
-                else : self.pcode.append(rAct)  # push builtin for runtime
-            else :
-                # Number to be pushed onto ds at runtime
-                self.pcode.append(self.rPush)
-                try : self.pcode.append(int(word))
-                except :
-                    try: self.pcode.append(float(word))
-                    except : 
-                        if type(word) == type(['list']):
-                            self.pcode.append(word)
-                        if type(word) == type("string"):
-                            c = word[0]
-                            if c == '"' or c == "'":
-                                self.pcode.append(word[1:-1])
-                            else:
-                                self.pcode[-1] = self.rRun     # Change rPush to rRun
-                                self.pcode.append(word)   # Assume word will be defined
-            if not self.cStack :
-                return self.pcode
-            self.prompt = "...    "
-            self.sendLine(self.prompt)
+    def _floatlike(self, a):
+        if self._intlike(a):
+            return False
+        try:
+            float(a)
+            return True
+        except:
+            return False
 
-
-class ForthBot(LogBot):
-    """A logging IRC bot."""
-    
-    nickname = "joanie"
-    
-    def connectionMade(self):
-        irc.IRCClient.connectionMade(self)
-        self.logger = MessageLogger(open(self.factory.filename, "a"))
-        self.logger.log("[connected at %s]" % 
-                        time.asctime(time.localtime(time.time())))
-
-    def connectionLost(self, reason):
-        irc.IRCClient.connectionLost(self, reason)
-        self.logger.log("[disconnected at %s]" % 
-                        time.asctime(time.localtime(time.time())))
-        self.logger.close()
-
-
-    # callbacks for events
-
-    def signedOn(self):
-        """Called when bot has succesfully signed on to server."""
-        self.join(self.factory.channel)
-
-    def joined(self, channel):
-        """This will get called when the bot joins the channel."""
-        self.logger.log("[I have joined %s]" % channel)
-
-    def privmsg(self, user, channel, msg):
-        """This will get called when the bot receives a message."""
-        user = user.split('!', 1)[0]
-        self.logger.log("<%s> %s" % (user, msg))
-        
-        # Check to see if they're sending me a private message
-        if channel == self.nickname:
-            msg = "It isn't nice to whisper!  Play nice with the group."
-            self.msg(user, msg)
-            return
-
-        # Otherwise check to see if it is a message directed at me
-        if msg.startswith(self.nickname + ":"):
-            msg = "%s: I am a log bot" % user
-            self.msg(channel, msg)
-            self.logger.log("<%s> %s" % (self.nickname, msg))
-
-    def action(self, user, channel, msg):
-        """This will get called when the bot sees someone do an action."""
-        user = user.split('!', 1)[0]
-        self.logger.log("* %s %s" % (user, msg))
-
-    # irc callbacks
-
-    def irc_NICK(self, prefix, params):
-        """Called when an IRC user changes their nickname."""
-        old_nick = prefix.split('!')[0]
-        new_nick = params[0]
-        self.logger.log("%s is now known as %s" % (old_nick, new_nick))
-
-
-    # For fun, override the method that determines how a nickname is changed on
-    # collisions. The default method appends an underscore.
-    def alterCollidedNick(self, nickname):
-        """
-        Generate an altered version of a nickname that caused a collision in an
-        effort to create an unused related name for subsequent registration.
-        """
-        return nickname + '^'
+    def fix_type(self, word):
+        # Number to be pushed onto ds at runtime
+        if self._intlike(word):
+            return int(word)
+        if self._floatlike(word):
+            return float(word)
+        if isinstance(word, list) or isinstance(word, dict):
+            return word
+        if word[0] in ["'", '"']:
+            return word
+        return None
 
 
 
+
+if __name__ == "__main__":
+    stdio.StandardIO(Forth())
+    reactor.run()

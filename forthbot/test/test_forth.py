@@ -1,7 +1,7 @@
 from twisted.trial.unittest import TestCase, SkipTest
 
 from forthbot.forth import compile, execute, tokenizeWords
-from forthbot import forth
+from forthbot import txforth as forth
 from subprocess import Popen, PIPE
 from twisted.python import procutils
 from twisted.python.filepath import FilePath

@@ -153,7 +153,6 @@ if __name__ == '__main__':
 
     # connect factory to this host and port
     reactor.connectTCP("10.1.2.209", 6667, f)
-    reactor.connectTCP("10.1.2.209", 6667, f)
 
     # run bot
     reactor.run()
