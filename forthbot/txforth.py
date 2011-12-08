@@ -65,18 +65,17 @@ class Forth(basic.LineReceiver):
     def rJmp (self, cod,p) : return cod[p]
     def rJnz (self, cod,p) : return (cod[p],p+1)[self.ds.pop()]
     def rJz  (self, cod,p) : return (p+1,cod[p])[self.ds.pop()==0]
-    def rRun (self, cod,p) : self.execute(self.rDict[cod[p]]); return p+1
+    def rRun (self, cod,p) : self._runPcode(self.rDict[cod[p]]); return p+1
     def rPush(self, cod,p) : self.ds.append(cod[p])     ; return p+1
 
     def rCreate (self, pcode,p) :
-        print "changing state to create"
         self.state = 'create'
 
     def state_create(self, label):
-        print "in state_create"
         self.lastCreate = label       # match next word (input) to next heap address
         self.rDict[label] = [self.rPush, self.heapNext]    # when created word is run, pushes its address
-        self.execute(self.pcode)
+        return 'init'
+
 
     def rDoes (self, cod,p) :
         self.rDict[self.lastCreate] += cod[p:]        # rest of words belong to created words runtime
@@ -168,7 +167,6 @@ class Forth(basic.LineReceiver):
 
 
     def wordReceived(self, word):
-        print "doing word", word
         try:
             pto = 'state_'+self.state
             statehandler = getattr(self,pto)
@@ -177,7 +175,8 @@ class Forth(basic.LineReceiver):
         else:
             self.state = statehandler(word)
             if self.state == 'done':
-                pass
+                print "DONE", self.pcode 
+                
 
 
     def tokenizeWords(self, s) :
@@ -211,8 +210,10 @@ class Forth(basic.LineReceiver):
             else:
                 self.pcode.append(res)
         if self.cStack == []:
-            v = self.execute(self.pcode)
-            return 'init'
+            v = self._runPcode(self.pcode)
+            #self.p = 0
+            #return self.pcodeReceived(self.pcode)
+            return v
         return 'compile'
 
 
@@ -226,15 +227,69 @@ class Forth(basic.LineReceiver):
     def do_cAct(self, cAct, word):
         return cAct(self.pcode)
 
+    def _runPcode(self, pcode):
+        self.p = 0
+        gen = self.g_pcodeReceived(pcode).next
+        ret = gen()
+        return ret
+
+    pstate = 'start'
+
+    def pcodeReceived(self, pcode):
+        try:
+            pto = 'pstate_'+self.pstate
+            statehandler = getattr(self,pto)
+        except AttributeError:
+            try:
+                pto = 'state_'+self.state
+                statehandler = getattr(self, pto)
+            except AttributeError:
+                log.msg('callback',self.pstate,'not found')
+        else:
+            self.pstate = statehandler(pcode)
+            if self.pstate == 'done':
+                print "pcodeReceived DONE"
+
+    def pstate_start(self, pcode):
+        self.p = 0
+        return self.pstate_run(pcode)
+
+
+    def pstate_run(self, pcode):
+        while self.p < len(pcode):
+            self.p = self.p_exec(pcode, self.p)
+            if self.state == 'create':
+                return 'create'
+        return 'init'
+
+
+ 
+    def g_pcodeReceived(self, pcode):
+        while self.p < len(pcode):
+            self.p = self.p_exec(pcode, self.p)
+            if self.state == 'create':
+                yield 'create'
+        yield 'init'
+
+
+    def p_exec(self, pcode, p):
+        func = pcode[p]
+        p +=1 
+        newP = func(pcode, p)
+        if newP != None: p = newP
+        return p
+
 
     def execute (self, code) :
-        print code
         p = 0
         while p < len(code) :
             func = code[p]
             p += 1
             newP = func(code,p)
             if newP != None : p = newP
+            if self.state == 'create':
+                return self.state
+        return 'init'
 
 
     def _intlike(self, a):

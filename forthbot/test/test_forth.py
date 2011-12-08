@@ -32,6 +32,20 @@ class ImprovedForth(TestCase):
         e = '[1, 2, 3, 4, 5, 6]'
         self.assertTrue(e in o, "%s did not contain %s" % (o, e))
 
+class TestPcode(TestCase):
+    def setUp(self):
+        self.f = forth.Forth()
+
+    def test_pcode(self):
+        def fake(pcode):
+            for p in pcode:
+                self.f.pcodeReceived([p])
+
+
+
+        self.f._runPcode = fake
+        self.f.lineReceived('5 5 + .')
+
 
 class TestForth(TestCase):
     def setUp(self):
@@ -78,6 +92,12 @@ class TestDoc(TestCase):
         p = '5 6 + 7 8 + * .'
         self._runforth(p)
         self.assertEquals(self.sentLines[-2], '165')
+
+    def test_create(self):
+        p = 'create v1 1 allot v1 .'
+        self._runforth(p)
+        print self.sentLines
+        self.assertEquals(self.sentLines[-2], '0')
 
     def test_dump(self):
         p = '5 dump 6 dump + dump 7 dump 8 dump + dump * dump'
@@ -158,5 +178,8 @@ ds =  [1307674368000L, 1]
         p = ': constant create , does> @ ;\n2009 constant thisYear\nthisYear .'
         self._runforth(p)
         self.assertEquals(self.sentLines[-2], '2009')
+
+
+
 
 

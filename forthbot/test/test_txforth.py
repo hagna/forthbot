@@ -100,7 +100,6 @@ Forth>
         p = '5 6 + 7 8 + * .'
         self._runforth(p)
         self.expect_this(165)
-        print self.f.ds
 
     def test_dump(self):
         p = '5 dump 6 dump + dump 7 dump 8 dump + dump * dump'
@@ -199,5 +198,14 @@ ds =  [1307674368000L, 1]
         p = ': constant create , does> @ ;\n2009 constant thisYear\nthisYear .'
         g = "Forth> " * 2 + self.expect_this(2009)
         self._cmpforth(p, g)
+
+
+    def test_create(self):
+        p = 'create v1 1 allot v1 dump'
+        g =  "0"
+        self._runforth(p)
+        self.expect_this(0)
+
+
 
 
