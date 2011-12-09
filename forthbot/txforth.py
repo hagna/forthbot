@@ -15,14 +15,6 @@ BEGIN = 'begin'
 UNTIL = 'until'
 
 class Forth(basic.LineReceiver):
-    ds = []
-    cStack   = []          # The control struct stack
-    heap     = [0]*20      # The data heap
-    heapNext =  0          # Next avail slot in heap
-    words    = []          # The input stream of tokens
-
-    ps = ["Forth> ", "...    "]
-
 
     punctuation = string.punctuation
     punctuation.replace('#', '')
@@ -35,6 +27,16 @@ class Forth(basic.LineReceiver):
     delimiter = '\n' # unix terminal style newlines. remove this line
 
     def __init__(self):
+        self.ds = []
+        self.cStack   = []          # The control struct stack
+        self.rStack   = []
+        self.heap     = [0]*20      # The data heap
+        self.heapNext =  0          # Next avail slot in heap
+        self.words    = []          # The input stream of tokens
+
+        self.ps = ["Forth> ", "...    "]
+
+
         self.cDict = {
             ':'    : self.cColon, ';'    : self.cSemi, 'if': self.cIf, 'else': self.cElse, 
             'then': self.cThen, 'begin': self.cBegin, 'until': self.cUntil,
@@ -74,6 +76,11 @@ class Forth(basic.LineReceiver):
     def state_create(self, label):
         self.lastCreate = label       # match next word (input) to next heap address
         self.rDict[label] = [self.rPush, self.heapNext]    # when created word is run, pushes its address
+        while self.rStack:
+            pcode, p = self.rStack.pop()
+            print "resuming execution of %r at %d" % (pcode, p)
+            self.p = p
+            self._runPcode(pcode)
         return 'init'
 
 
@@ -151,11 +158,17 @@ class Forth(basic.LineReceiver):
     def lineReceived(self, line):
         """
         """
+        line = line.strip()
+        if not line:
+            return
+        if line[0:1] == '#':
+            return
         if line[0:1] == "@" : 
             lines = open(line[1:]).read()
-            for line in lines:
+            for line in lines.split('\n'):
                 self.lineReceived(line)
         else:
+            print "got line", line
             self.words = self.words + self.S.parseString(line).asList()
             while self.words:
                 word = self.words.pop(0)
@@ -167,6 +180,7 @@ class Forth(basic.LineReceiver):
 
 
     def wordReceived(self, word):
+        print "doing word", word
         try:
             pto = 'state_'+self.state
             statehandler = getattr(self,pto)
@@ -210,6 +224,7 @@ class Forth(basic.LineReceiver):
             else:
                 self.pcode.append(res)
         if self.cStack == []:
+            self.p = 0
             v = self._runPcode(self.pcode)
             #self.p = 0
             #return self.pcodeReceived(self.pcode)
@@ -228,7 +243,6 @@ class Forth(basic.LineReceiver):
         return cAct(self.pcode)
 
     def _runPcode(self, pcode):
-        self.p = 0
         gen = self.g_pcodeReceived(pcode).next
         ret = gen()
         return ret
@@ -268,6 +282,7 @@ class Forth(basic.LineReceiver):
         while self.p < len(pcode):
             self.p = self.p_exec(pcode, self.p)
             if self.state == 'create':
+                self.rStack.append((pcode, self.p))
                 yield 'create'
         yield 'init'
 

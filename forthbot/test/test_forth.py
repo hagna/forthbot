@@ -80,8 +80,7 @@ class TestDoc(TestCase):
         self.sentLines = []
 
     def tearDown(self):
-        forth.words = []
-        forth.ds = []
+        pass
 
 
     def _runforth(self, s):
@@ -133,16 +132,15 @@ class TestDoc(TestCase):
         p = "@%s\n 5 fact ." % FilePath(__file__).sibling('fact1.4th').path
         self._runforth(p)
         print self.sentLines
-        g = '''\
-Forth> ds =  [0, 5, 4, 3, 2, 1]
-ds =  [0, 5, 4, 3, 2]
-ds =  [0, 5, 4, 6]
-ds =  [0, 5, 24]
-120'''
-        self._cmpforth(p, self.expect_this(g))
+        self.assertEquals(self.sentLines[-2], '120')
 
     def test_load_factorial2(self):
         p = "@%s\n 5 fact ." % FilePath(__file__).sibling('fact2.4th').path
+        self._runforth(p)
+        print self.sentLines
+        self.assertEquals(self.sentLines[-2], '120')
+
+
         g = '''\
 Forth> ds =  [5, 4, 3, 2, 1]
 ds =  [5, 4, 3, 2]
@@ -153,6 +151,11 @@ ds =  [5, 24]
 
     def test_load_factorial3(self):
         p = "@%s" % FilePath(__file__).sibling('fact3.4th').path
+        self._runforth(p)
+        print self.sentLines
+        self.assertEquals(self.sentLines[-2], '1307674368000')
+
+
         g = '''\
 ds =  [1, 15]
 ds =  [15, 14]
