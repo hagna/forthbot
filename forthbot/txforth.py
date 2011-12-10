@@ -6,14 +6,6 @@ from twisted.protocols import basic
 from twisted.internet import stdio, reactor
 
 
-COLON = ':'
-SCOLON = ';'
-IF = 'if'
-ELSE = 'else'
-THEN = 'then'
-BEGIN = 'begin'
-UNTIL = 'until'
-
 class Forth(basic.LineReceiver):
 
     punctuation = string.punctuation
@@ -79,8 +71,8 @@ class Forth(basic.LineReceiver):
         while self.rStack:
             pcode, p = self.rStack.pop()
             print "resuming execution of %r at %d" % (pcode, p)
-            self.p = p
-            self._runPcode(pcode)
+            #self.p = p
+            self._runPcode(pcode, p)
         return 'init'
 
 
@@ -168,7 +160,6 @@ class Forth(basic.LineReceiver):
             for line in lines.split('\n'):
                 self.lineReceived(line)
         else:
-            print "got line", line
             self.words = self.words + self.S.parseString(line).asList()
             while self.words:
                 word = self.words.pop(0)
@@ -180,7 +171,6 @@ class Forth(basic.LineReceiver):
 
 
     def wordReceived(self, word):
-        print "doing word", word
         try:
             pto = 'state_'+self.state
             statehandler = getattr(self,pto)
@@ -224,11 +214,7 @@ class Forth(basic.LineReceiver):
             else:
                 self.pcode.append(res)
         if self.cStack == []:
-            self.p = 0
-            v = self._runPcode(self.pcode)
-            #self.p = 0
-            #return self.pcodeReceived(self.pcode)
-            return v
+            return self._runPcode(self.pcode)
         return 'compile'
 
 
@@ -242,72 +228,26 @@ class Forth(basic.LineReceiver):
     def do_cAct(self, cAct, word):
         return cAct(self.pcode)
 
-    def _runPcode(self, pcode):
-        gen = self.g_pcodeReceived(pcode).next
-        ret = gen()
-        return ret
-
-    pstate = 'start'
-
-    def pcodeReceived(self, pcode):
-        try:
-            pto = 'pstate_'+self.pstate
-            statehandler = getattr(self,pto)
-        except AttributeError:
-            try:
-                pto = 'state_'+self.state
-                statehandler = getattr(self, pto)
-            except AttributeError:
-                log.msg('callback',self.pstate,'not found')
-        else:
-            self.pstate = statehandler(pcode)
-            if self.pstate == 'done':
-                print "pcodeReceived DONE"
-
-    def pstate_start(self, pcode):
-        self.p = 0
-        return self.pstate_run(pcode)
-
-
-    def pstate_run(self, pcode):
-        while self.p < len(pcode):
-            self.p = self.p_exec(pcode, self.p)
+    def _runPcode(self, pcode, p=0):
+	import pprint
+	print "_runPcode:"
+	pprint.pprint(pcode)
+        while p < len(pcode):
+            p = self.p_exec(pcode, p)
             if self.state == 'create':
+                self.rStack.append((pcode, p))
                 return 'create'
         return 'init'
 
 
- 
-    def g_pcodeReceived(self, pcode):
-        while self.p < len(pcode):
-            self.p = self.p_exec(pcode, self.p)
-            if self.state == 'create':
-                self.rStack.append((pcode, self.p))
-                yield 'create'
-        yield 'init'
-
-
     def p_exec(self, pcode, p):
         func = pcode[p]
-	print "    ds:", self.ds
-	print "p_exec:", func
+	print "    p_exec:", func
         p +=1 
         newP = func(pcode, p)
-	print "    ds:", self.ds
+	print "        ds:", self.ds
         if newP != None: p = newP
         return p
-
-
-    def execute (self, code) :
-        p = 0
-        while p < len(code) :
-            func = code[p]
-            p += 1
-            newP = func(code,p)
-            if newP != None : p = newP
-            if self.state == 'create':
-                return self.state
-        return 'init'
 
 
     def _intlike(self, a):
