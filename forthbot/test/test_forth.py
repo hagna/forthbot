@@ -98,6 +98,25 @@ class TestDoc(TestCase):
         print self.sentLines
         self.assertEquals(self.sentLines[-2], '0')
 
+    def test_two_vars(self):
+        p = '''\
+# fact3.4th
+
+: variable create 1 allot ;            #   ---     create var and init to TOS
+  variable m
+  variable answer
+
+: fact                                 #  n --- n!  replace TOS with factorial
+     m !                               # set m to TOS
+  1 answer !                           # set answer = 1
+;
+
+15 fact .
+'''
+        self._runforth(p)
+        self.assertEquals(self.f.ds, [])
+
+
     def test_dump(self):
         p = '5 dump 6 dump + dump 7 dump 8 dump + dump * dump'
         self._runforth(p)

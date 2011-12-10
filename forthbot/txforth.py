@@ -92,7 +92,7 @@ class Forth(basic.LineReceiver):
         self.heapNext += self.ds.pop()                # reserve n words for last create
 
     def rAt  (self, cod,p) : self.ds.append(self.heap[self.ds.pop()])       # get heap @ address
-    def rBang(self, cod,p) : a=self.ds.pop(); self.heap[a] = self.ds.pop()  # set heap @ address
+    def rBang(self, cod,p) : print "rbang"; a=self.ds.pop(); print a; print self.heap; self.heap[a] = self.ds.pop()  # set heap @ address
     def rComa(self, cod,p) :                                 # push tos into heap
         self.heap[self.heapNext]=self.ds.pop()
         self.heapNext += 1
@@ -289,8 +289,11 @@ class Forth(basic.LineReceiver):
 
     def p_exec(self, pcode, p):
         func = pcode[p]
+	print "    ds:", self.ds
+	print "p_exec:", func
         p +=1 
         newP = func(pcode, p)
+	print "    ds:", self.ds
         if newP != None: p = newP
         return p
 
