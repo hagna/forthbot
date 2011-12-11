@@ -30,7 +30,7 @@ class _IrcBotPlugin(object):
 			('channel', 'c', 'test', 'channel to join'),
              ]
 
-    description = "ircbot log bot version: %s" % __version__
+    description = "logging and forth bot version: %s" % __version__
 
     tapname = "ircbot"
 

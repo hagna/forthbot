@@ -1,6 +1,6 @@
 from twisted.trial.unittest import TestCase, SkipTest
 
-from forthbot.forth import compile, execute, tokenizeWords
+from forthbot.forth import compile, execute
 from forthbot import txforth as forth
 from subprocess import Popen, PIPE
 from twisted.python import procutils
@@ -8,69 +8,8 @@ from twisted.python.filepath import FilePath
 
 
 
-def _runforth(s):
-    forthproc = forth.__file__
-    p = procutils.which('python')[0]
-    p2 = Popen([p, forthproc], stdin=PIPE, stdout=PIPE)
-    output = p2.communicate(input=s)[0]
-    return output
 
-
-class ImprovedForth(TestCase):
-    def setUp(self):
-        pass
-
-    def test_append_strings(self):
-        i = '"abc" "def" + .'
-        c = 'abcdef'
-        o = _runforth(i)
-        self.assertTrue(c in o, "%s did not contain %s" % (o, c))
-
-    def test_append_lists(self):
-        i = '[1, 2, 3] [4, 5, 6] + .'
-        o = _runforth(i)
-        e = '[1, 2, 3, 4, 5, 6]'
-        self.assertTrue(e in o, "%s did not contain %s" % (o, e))
-
-class TestPcode(TestCase):
-    def setUp(self):
-        self.f = forth.Forth()
-
-    def test_pcode(self):
-        def fake(pcode):
-            for p in pcode:
-                self.f.pcodeReceived([p])
-
-
-
-        self.f._runPcode = fake
-        self.f.lineReceived('5 5 + .')
-
-
-class TestForth(TestCase):
-    def setUp(self):
-        forth.words = []
-
-    def tearDown(self):
-        forth.words = []
-
-    def test_tokenizeWords(self):
-        tokenizeWords('a b c d e 1 2 34')
-        self.assertEquals(forth.words, ['a', 'b', 'c', 'd', 'e', 1, 2, 34])
-
-    def test_tokenizeWords_comments(self):
-        tokenizeWords('a b c d e 1 2 # 34')
-        self.assertEquals(forth.words, ['a', 'b', 'c', 'd', 'e', 1, 2])
-
-    def test_tokenizeWords_strings(self):
-        tokenizeWords('"nate test" "this" \'out\' 1 2')
-        self.assertEquals(forth.words, ['"nate test"', '"this"', "'out'", 1, 2])
-
-
-class TestDoc(TestCase):
-    """
-    A few test cases from http://openbookproject.net/py4fun/forth/forth.html
-    """
+class ForthRunner(TestCase):
     def fakeSendLine(self, s):
         self.sentLines.append(s)
 
@@ -79,13 +18,63 @@ class TestDoc(TestCase):
         self.f.sendLine = self.fakeSendLine
         self.sentLines = []
 
-    def tearDown(self):
-        pass
-
-
     def _runforth(self, s):
         for line in s.split('\n'):
             self.f.lineReceived(line)
+
+
+class ImprovedForth(ForthRunner):
+
+    def test_append_strings(self):
+        i = '"abc" "def" + .'
+        c = 'abcdef'
+        self._runforth(i)
+        o = self.sentLines
+        self.assertTrue(c in self.sentLines, "%s did not contain %s" % (o, c))
+
+    def test_append_lists(self):
+        i = '[1, 2, 3] [4, 5, 6] + .'
+	c = '[1, 2, 3, 4, 5, 6]'
+        self._runforth(i)
+        o = self.sentLines
+        self.assertTrue(c in self.sentLines, "%s did not contain %s" % (o, c))
+
+
+class TestForth(TestCase):
+    def setUp(self):
+        self.f = forth.Forth()
+
+    def test_tokenizeWords(self):
+        res = self.f.tokenizeWords('a b c d e 1 2 34')
+        self.assertEquals(res, ['a', 'b', 'c', 'd', 'e', 1, 2, 34])
+
+    def test_tokenizeWords_comments(self):
+        res = self.f.tokenizeWords('a b c d e 1 2 # 34')
+        self.assertEquals(res, ['a', 'b', 'c', 'd', 'e', 1, 2])
+
+    def test_toklists(self):
+        res = self.f.tokenizeWords('["a", "b"] 1 2 3 c d e')
+        self.assertEquals(res, [['a', 'b'], 1, 2, 3, 'c', 'd', 'e'])
+
+    def test_tokdict(self):
+        res = self.f.tokenizeWords("{'foo':2} 1 2 3 c d e")
+        self.assertEquals(res, [{'foo':2}, 1, 2, 3, 'c', 'd', 'e'])
+
+    def test_tokstrings(self):
+        res = self.f.tokenizeWords("'abc' 'def' 1 2 3")
+        self.assertEquals(res, ['abc', 'def', 1, 2, 3])
+
+
+
+    def test_tokenizeWords_strings(self):
+        res = self.f.tokenizeWords('"nate test" "this" \'out\' 1 2')
+        self.assertEquals(res, ['"nate test"', '"this"', "'out'", 1, 2])
+
+
+class TestDoc(ForthRunner):
+    """
+    A few test cases from http://openbookproject.net/py4fun/forth/forth.html
+    """
 
     def test_add_mult(self):
         p = '5 6 + 7 8 + * .'
@@ -111,9 +100,10 @@ class TestDoc(TestCase):
   1 answer !                           # set answer = 1
 ;
 
-15 fact .
+15 fact 
 '''
         self._runforth(p)
+	self.assertEquals(self.sentLines, ['Forth> ', 'Forth> ', 'Forth> ', '...    ', '...    ', '...    ', 'Forth> ', 'Forth> '])
         self.assertEquals(self.f.ds, [])
 
 
@@ -156,23 +146,14 @@ class TestDoc(TestCase):
     def test_load_factorial2(self):
         p = "@%s\n 5 fact ." % FilePath(__file__).sibling('fact2.4th').path
         self._runforth(p)
-        print self.sentLines
         self.assertEquals(self.sentLines[-2], '120')
 
-
-        g = '''\
-Forth> ds =  [5, 4, 3, 2, 1]
-ds =  [5, 4, 3, 2]
-ds =  [5, 4, 6]
-ds =  [5, 24]
-120'''
-        self._cmpforth(p, self.expect_this(g))
 
     def test_load_factorial3(self):
         p = "@%s" % FilePath(__file__).sibling('fact3.4th').path
         self._runforth(p)
         print self.sentLines
-        self.assertEquals(self.sentLines[-2], '1307674368000')
+        self.assertEquals(self.sentLines[-3], '1307674368000')
 
 
         g = '''\
@@ -192,7 +173,6 @@ ds =  [217945728000L, 3]
 ds =  [653837184000L, 2]
 ds =  [1307674368000L, 1]
 1307674368000'''
-        self._cmpforth(p, self.expect_this(g))
 
 
 

@@ -160,7 +160,7 @@ class Forth(basic.LineReceiver):
             for line in lines.split('\n'):
                 self.lineReceived(line)
         else:
-            self.words = self.words + self.S.parseString(line).asList()
+            self.words = self.words + self.tokenizeWords(line)
             while self.words:
                 word = self.words.pop(0)
                 self.wordReceived(word)
@@ -184,9 +184,8 @@ class Forth(basic.LineReceiver):
 
 
     def tokenizeWords(self, s) :
-        global words 
         # clip comments, split to list of words
-        self.words = self.S.parseString(s).asList()
+        return self.S.parseString(s).asList()
 
 
     def state_init(self, word):
@@ -194,9 +193,26 @@ class Forth(basic.LineReceiver):
         return self.state_compile(word)
 
 
+    def _get_cAct(self, word):
+        cAct = None
+        try:
+            cAct = self.cDict.get(word)
+        except Exception, e:
+            print e
+        return cAct
+ 
+    def _get_rAct(self, word):
+        rAct = None
+        try:
+            rAct = self.rDict.get(word)
+        except Exception, e:
+            print e
+        return rAct
+ 
+
     def state_compile(self, word):
-        cAct = self.cDict.get(word, None)
-        rAct = self.rDict.get(word, None)
+	cAct = self._get_cAct(word)
+	rAct = self._get_rAct(word)
         if cAct:
             z = self.do_cAct(cAct, word)
             if z is not None:
