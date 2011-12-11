@@ -60,7 +60,10 @@ class Forth(basic.LineReceiver):
     def rJnz (self, cod,p) : return (cod[p],p+1)[self.ds.pop()]
     def rJz  (self, cod,p) : return (p+1,cod[p])[self.ds.pop()==0]
     def rRun (self, cod,p) : self._runPcode(self.rDict[cod[p]]); return p+1
-    def rPush(self, cod,p) : self.ds.append(cod[p])     ; return p+1
+    def rPush(self, cod,p) : 
+        a = cod[p]
+        self.ds.append(a)
+        return p+1
 
     def rCreate (self, pcode,p) :
         self.state = 'create'

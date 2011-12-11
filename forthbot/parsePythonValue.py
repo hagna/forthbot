@@ -26,7 +26,7 @@ tupleStr = Forward()
 listStr = Forward()
 dictStr = Forward()
 
-listItem = real|integer|quotedString| \
+listItem = real|integer|quotedString.setParseAction(removeQuotes)| \
             Group(listStr) | tupleStr | dictStr
 
 tupleStr << ( Suppress("(") + Optional(delimitedList(listItem)) + 
@@ -51,14 +51,13 @@ tests = """['a', 100, ('A', [101,102]), 3.14, [ +2.718, 'xyzzy', -1.414] ]
            1.0e-7
            'a quoted string'""".split("\n")
 
-if __name__ == '__main__':
-    for test in tests:
-        print "Test:", test.strip()
-        result = listItem.parseString(test)[0]
-        print "Result:", result
-        try:
-            for dd in result:
-                if isinstance(dd,dict): print dd.items()
-        except TypeError,te:
-            pass
-        print
+for test in tests:
+    print "Test:", test.strip()
+    result = listItem.parseString(test)[0]
+    print "Result:", result
+    try:
+        for dd in result:
+            if isinstance(dd,dict): print dd.items()
+    except TypeError,te:
+        pass
+    print
