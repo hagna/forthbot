@@ -53,7 +53,9 @@ tests = """['a', 100, ('A', [101,102]), 3.14, [ +2.718, 'xyzzy', -1.414] ]
 
 for test in tests:
     print "Test:", test.strip()
-    result = listItem.parseString(test)[0]
+    result = listItem.parseString(test)
+    print result
+    result = result[0]
     print "Result:", result
     try:
         for dd in result:

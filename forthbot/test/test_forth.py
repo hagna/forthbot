@@ -34,7 +34,7 @@ class ImprovedForth(ForthRunner):
 
     def test_append_lists(self):
         i = '[1, 2, 3] [4, 5, 6] + .'
-	c = '[1, 2, 3, 4, 5, 6]'
+    	c = '[1, 2, 3, 4, 5, 6]'
         self._runforth(i)
         o = self.sentLines
         self.assertTrue(c in self.sentLines, "%s did not contain %s" % (o, c))
@@ -46,7 +46,8 @@ class TestForth(TestCase):
 
     def test_tokenizeWords(self):
         res = self.f.tokenizeWords('a b c d e 1 2 34')
-        self.assertEquals(res, ['a', 'b', 'c', 'd', 'e', 1, 2, 34])
+        self.assertEquals(res, [('I', 'a'), ('I', 'b'), ('I', 'c'), ('I', 'd'), ('I', 'e'), 
+                                ('P', 1), ('P', 2), ('P', 34)])
 
     def test_tokenizeWords_comments(self):
         res = self.f.tokenizeWords('a b c d e 1 2 # 34')
@@ -103,7 +104,7 @@ class TestDoc(ForthRunner):
 15 fact 
 '''
         self._runforth(p)
-	self.assertEquals(self.sentLines, ['Forth> ', 'Forth> ', 'Forth> ', '...    ', '...    ', '...    ', 'Forth> ', 'Forth> '])
+        self.assertEquals(self.sentLines, ['Forth> ', 'Forth> ', 'Forth> ', '...    ', '...    ', '...    ', 'Forth> ', 'Forth> '])
         self.assertEquals(self.f.ds, [])
 
 

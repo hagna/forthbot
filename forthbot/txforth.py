@@ -6,15 +6,33 @@ from twisted.protocols import basic
 from twisted.internet import stdio, reactor
 
 
+WORD = 'I'
+PYVAL = 'P'
+
+class ForthWord(str):
+    pass
+
 class Forth(basic.LineReceiver):
 
     punctuation = string.punctuation
     punctuation.replace('#', '')
     punctuation.replace('"', '')
 
-    I = Word(string.letters + punctuation + string.digits) 
-    D = listItem | I 
+    I = Word(string.letters + punctuation + string.digits)
+    I.setParseAction(lambda s,l,t: [ForthWord(t[0])])
+    D = listItem | I
     S = OneOrMore(D).ignore(pythonStyleComment)
+
+    def isForthWord(self, w):
+        return w[0] == IDENT
+
+    def isPyVal(self, w):
+        return w[0] == PYVAL
+
+    def tokenizeWords(self, s) :
+        # clip comments, split to list of words
+        res = self.S.parseString(s).asList()
+        return res
 
     delimiter = '\n' # unix terminal style newlines. remove this line
 
@@ -186,11 +204,6 @@ class Forth(basic.LineReceiver):
                 
 
 
-    def tokenizeWords(self, s) :
-        # clip comments, split to list of words
-        return self.S.parseString(s).asList()
-
-
     def state_init(self, word):
         self.pcode = []; self.prompt = self.ps[0]
         return self.state_compile(word)
@@ -214,24 +227,25 @@ class Forth(basic.LineReceiver):
  
 
     def state_compile(self, word):
-	cAct = self._get_cAct(word)
-	rAct = self._get_rAct(word)
-        if cAct:
-            z = self.do_cAct(cAct, word)
-            if z is not None:
-                return z
+        if isinstance(word, ForthWord):
+            cAct = self._get_cAct(word)
+            rAct = self._get_rAct(word)
+            if cAct:
+                z = self.do_cAct(cAct, word)
+                if z is not None:
+                    return z
 
-        elif rAct:
-            self.do_rAct(rAct, word)
+            elif rAct:
+                self.do_rAct(rAct, word)
+
+            else:
+                self.pcode.append(self.rRun) # change push to run
+                self.pcode.append(word) # assume the word will be defined
 
         else:
             self.pcode.append(self.rPush)
-            res = self.fix_type(word)
-            if res is None:
-                self.pcode[-1] = self.rRun # change push to run
-                self.pcode.append(word) # assume the word will be defined
-            else:
-                self.pcode.append(res)
+            self.pcode.append(word)
+
         if self.cStack == []:
             return self._runPcode(self.pcode)
         return 'compile'
