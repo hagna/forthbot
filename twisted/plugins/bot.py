@@ -27,6 +27,7 @@ class _IrcBotPlugin(object):
         optParameters = [
             ('port', 'p', 6667, 'TCP port to connect to.', portCoerce),
 			('server', 's', '10.1.2.209', 'IRC server'),
+            ('nick', 'n', 'rpnbot', 'Nickname'),
 			('channel', 'c', 'test', 'channel to join'),
              ]
 
@@ -40,7 +41,6 @@ class _IrcBotPlugin(object):
 
         @param options: mapping of configuration
         """
-        from pygame.image import load
 
         from forthbot.ircBot import BotFactory
         from twisted.python.filepath import FilePath
@@ -49,8 +49,9 @@ class _IrcBotPlugin(object):
         port = options['port']
         server = options['server']
         channel = options['channel']
+        nickname = options['nick']
         logfile = channel + '.log'
-        f = BotFactory(channel, logfile)
+        f = BotFactory(channel, logfile, nickname)
 
         service = MultiService()
         tcp = TCPClient(server, port, f)
