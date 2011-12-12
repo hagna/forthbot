@@ -1,32 +1,9 @@
-# Copyright (c) Twisted Matrix Laboratories.
-# See LICENSE for details.
-
-
-"""
-An example IRC log bot - logs a channel's events to a file.
-
-If someone says the bot's name in the channel followed by a ':',
-e.g.
-
-  <foo> logbot: hello!
-
-the bot will reply:
-
-  <logbot> foo: I am a log bot
-
-Run this script with two arguments, the channel name the bot should
-connect to, and file to log to, e.g.:
-
-  $ python ircLogBot.py test test.log
-
-will log channel #test to the file 'test.log'.
-"""
-
-
 # twisted imports
 from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol
 from twisted.python import log
+
+from txforth import Forth
 
 # system imports
 import time, sys
@@ -50,12 +27,12 @@ class MessageLogger:
         self.file.close()
 
 
-class LogBot(irc.IRCClient):
+class Bot(irc.IRCClient):
     """A logging IRC bot."""
     
-    nickname = "joanie"
     
     def connectionMade(self):
+        self.nickname = self.factory.nick
         irc.IRCClient.connectionMade(self)
         self.logger = MessageLogger(open(self.factory.filename, "a"))
         self.logger.log("[connected at %s]" % 
@@ -84,16 +61,24 @@ class LogBot(irc.IRCClient):
         self.logger.log("<%s> %s" % (user, msg))
         
         # Check to see if they're sending me a private message
+        send_message = lambda msg: self.msg(user, msg) 
         if channel == self.nickname:
-            msg = "It isn't nice to whisper!  Play nice with the group."
-            self.msg(user, msg)
-            return
+            self.logger.log("/msg <%s> %s" % (self.nickname, msg))
 
         # Otherwise check to see if it is a message directed at me
         if msg.startswith(self.nickname + ":"):
-            msg = "%s: I am a log bot" % user
-            self.msg(channel, msg)
+            i = len(self.nickname + ':')
+            msg = msg[i:]
+            send_message = lambda msg: self.msg(channel, msg) 
             self.logger.log("<%s> %s" % (self.nickname, msg))
+
+        self.factory.forth.sendLine = send_message
+        try:
+            self.factory.forth.lineReceived(msg)
+        except Exception, e:
+            log.err()
+            send_message(str(e)) 
+
 
     def action(self, user, channel, msg):
         """This will get called when the bot sees someone do an action."""
@@ -120,18 +105,20 @@ class LogBot(irc.IRCClient):
 
 
 
-class LogBotFactory(protocol.ClientFactory):
+class BotFactory(protocol.ClientFactory):
     """A factory for LogBots.
 
     A new protocol instance will be created each time we connect to the server.
     """
 
-    def __init__(self, channel, filename):
+    def __init__(self, channel, filename, nick='hp48'):
         self.channel = channel
         self.filename = filename
+        self.nick = nick
+        self.forth = Forth()
 
     def buildProtocol(self, addr):
-        p = LogBot()
+        p = Bot()
         p.factory = self
         return p
 
@@ -149,7 +136,7 @@ if __name__ == '__main__':
     log.startLogging(sys.stdout)
     
     # create factory protocol and application
-    f = LogBotFactory(sys.argv[1], sys.argv[2])
+    f = BotFactory(sys.argv[1], sys.argv[2])
 
     # connect factory to this host and port
     reactor.connectTCP("10.1.2.209", 6667, f)

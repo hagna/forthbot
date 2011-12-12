@@ -42,16 +42,15 @@ class _IrcBotPlugin(object):
         """
         from pygame.image import load
 
-        from forthbot.ircLogBot import LogBotFactory
+        from forthbot.ircBot import BotFactory
         from twisted.python.filepath import FilePath
         from twisted.internet import reactor
         from twisted.application.service import MultiService
-        from twisted.protocols.policies import TrafficLoggingFactory
         port = options['port']
         server = options['server']
         channel = options['channel']
         logfile = channel + '.log'
-        f = LogBotFactory(channel, logfile)
+        f = BotFactory(channel, logfile)
 
         service = MultiService()
         tcp = TCPClient(server, port, f)

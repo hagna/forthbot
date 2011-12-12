@@ -45,6 +45,7 @@ class Forth(basic.LineReceiver):
         self.words    = []          # The input stream of tokens
 
         self.ps = ["Forth> ", "...    "]
+        self.p = 0
 
 
         self.cDict = {
@@ -91,7 +92,6 @@ class Forth(basic.LineReceiver):
         self.rDict[label] = [self.rPush, self.heapNext]    # when created word is run, pushes its address
         while self.rStack:
             pcode, p = self.rStack.pop()
-            print "resuming execution of %r at %d" % (pcode, p)
             #self.p = p
             self._runPcode(pcode, p)
         return 'init'
@@ -105,7 +105,7 @@ class Forth(basic.LineReceiver):
         self.heapNext += self.ds.pop()                # reserve n words for last create
 
     def rAt  (self, cod,p) : self.ds.append(self.heap[self.ds.pop()])       # get heap @ address
-    def rBang(self, cod,p) : print "rbang"; a=self.ds.pop(); print a; print self.heap; self.heap[a] = self.ds.pop()  # set heap @ address
+    def rBang(self, cod,p) : a=self.ds.pop(); self.heap[a] = self.ds.pop()  # set heap @ address
     def rComa(self, cod,p) :                                 # push tos into heap
         self.heap[self.heapNext]=self.ds.pop()
         self.heapNext += 1
@@ -165,9 +165,6 @@ class Forth(basic.LineReceiver):
     state = 'init'
 
 
-    def connectionMade(self):
-        self.sendLine(self.ps[0])
-
     def lineReceived(self, line):
         """
         """
@@ -186,9 +183,16 @@ class Forth(basic.LineReceiver):
                 word = self.words.pop(0)
                 self.wordReceived(word)
         if self.state == 'init':
-            self.sendLine(self.ps[0])
+            self.p = 0
         else:
-            self.sendLine(self.ps[1])
+            self.p = 1
+        self.prompt()
+
+
+    def prompt(self):
+        if self.p == 0:
+            return
+        self.sendLine(self.ps[self.p])
 
 
     def wordReceived(self, word):
@@ -205,7 +209,7 @@ class Forth(basic.LineReceiver):
 
 
     def state_init(self, word):
-        self.pcode = []; self.prompt = self.ps[0]
+        self.pcode = []; 
         return self.state_compile(word)
 
 
@@ -262,9 +266,6 @@ class Forth(basic.LineReceiver):
         return cAct(self.pcode)
 
     def _runPcode(self, pcode, p=0):
-	import pprint
-	print "_runPcode:"
-	pprint.pprint(pcode)
         while p < len(pcode):
             p = self.p_exec(pcode, p)
             if self.state == 'create':
@@ -275,10 +276,8 @@ class Forth(basic.LineReceiver):
 
     def p_exec(self, pcode, p):
         func = pcode[p]
-	print "    p_exec:", func
         p +=1 
         newP = func(pcode, p)
-	print "        ds:", self.ds
         if newP != None: p = newP
         return p
 

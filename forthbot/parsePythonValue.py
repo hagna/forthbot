@@ -51,15 +51,18 @@ tests = """['a', 100, ('A', [101,102]), 3.14, [ +2.718, 'xyzzy', -1.414] ]
            1.0e-7
            'a quoted string'""".split("\n")
 
-for test in tests:
-    print "Test:", test.strip()
-    result = listItem.parseString(test)
-    print result
-    result = result[0]
-    print "Result:", result
-    try:
-        for dd in result:
-            if isinstance(dd,dict): print dd.items()
-    except TypeError,te:
-        pass
-    print
+
+if __name__ == '__main__':
+
+    for test in tests:
+        print "Test:", test.strip()
+        result = listItem.parseString(test)
+        print result
+        result = result[0]
+        print "Result:", result
+        try:
+            for dd in result:
+                if isinstance(dd,dict): print dd.items()
+        except TypeError,te:
+            pass
+        print
