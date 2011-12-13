@@ -78,7 +78,13 @@ class Forth(basic.LineReceiver):
     def rJmp (self, cod,p) : return cod[p]
     def rJnz (self, cod,p) : return (cod[p],p+1)[self.ds.pop()]
     def rJz  (self, cod,p) : return (p+1,cod[p])[self.ds.pop()==0]
-    def rRun (self, cod,p) : self._runPcode(self.rDict[cod[p]]); return p+1
+    def rRun (self, cod,p) :
+        try:
+            w = cod[p]
+            self._runPcode(self.rDict[w]); return p+1
+        except KeyError, e:
+            self.fatal('Unknown command "%s"' % w)
+        
     def rPush(self, cod,p) : 
         a = cod[p]
         self.ds.append(a)
@@ -112,7 +118,7 @@ class Forth(basic.LineReceiver):
 
 
 
-    def fatal (self, mesg) : raise mesg
+    def fatal (self, mesg) : raise Exception(mesg)
 
     def cColon (self, pcode) :
         return 'colon'
