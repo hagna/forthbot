@@ -64,6 +64,7 @@ class Bot(irc.IRCClient):
         send_message = lambda msg: self.msg(user, msg) 
         if channel == self.nickname:
             self.logger.log("/msg <%s> %s" % (self.nickname, msg))
+            self.runforth(msg, send_message)
 
         # Otherwise check to see if it is a message directed at me
         if msg.startswith(self.nickname + ":"):
@@ -71,7 +72,9 @@ class Bot(irc.IRCClient):
             msg = msg[i:]
             send_message = lambda msg: self.msg(channel, msg) 
             self.logger.log("<%s> %s" % (self.nickname, msg))
+            self.runforth(msg, send_message)
 
+    def runforth(self, msg, send_message):
         self.factory.forth.sendLine = send_message
         try:
             self.factory.forth.lineReceived(msg)
@@ -139,7 +142,7 @@ if __name__ == '__main__':
     f = BotFactory(sys.argv[1], sys.argv[2])
 
     # connect factory to this host and port
-    reactor.connectTCP("10.1.2.209", 6667, f)
+    reactor.connectTCP("10.10.10.81", 6667, f)
 
     # run bot
     reactor.run()

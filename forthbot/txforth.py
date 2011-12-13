@@ -42,7 +42,6 @@ class Forth(basic.LineReceiver):
         self.rStack   = []
         self.heap     = [0]*20      # The data heap
         self.heapNext =  0          # Next avail slot in heap
-        self.words    = []          # The input stream of tokens
 
         self.ps = ["Forth> ", "...    "]
         self.p = 0
@@ -178,9 +177,9 @@ class Forth(basic.LineReceiver):
             for line in lines.split('\n'):
                 self.lineReceived(line)
         else:
-            self.words = self.words + self.tokenizeWords(line)
-            while self.words:
-                word = self.words.pop(0)
+            words = self.tokenizeWords(line)
+            while words:
+                word = words.pop(0)
                 self.wordReceived(word)
         if self.state == 'init':
             self.p = 0
