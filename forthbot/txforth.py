@@ -59,7 +59,7 @@ class Forth(basic.LineReceiver):
         '+'  : self.rAdd, '-'   : self.rSub, '/' : self.rDiv, '*'    : self.rMul,   'over': self.rOver,
         'dup': self.rDup, 'swap': self.rSwap, '.': self.rDot, 'dump' : self.rDump,  'drop': self.rDrop,
         '='  : self.rEq,  '>'   : self.rGt,   '<': self.rLt,  's' : self.rSend, 'load': self.rLoad,
-        'save': self.rSave, 'input': self.rInput,
+        'save': self.rSave, 'input': self.rInput, 'dir': self.rDir,
         ','  : self.rComa,'@'   : self.rAt, '!'  : self.rBang,'allot': self.rAllot,
 
         'create': self.rCreate, 'does>': self.rDoes,
@@ -90,6 +90,7 @@ class Forth(basic.LineReceiver):
     def rSave(self, cod,p) : self.saveState()
     def rLoad(self, cod,p) : self.loadState()
 
+    def rDir (self, cod,p) : a = self.ds.pop(); self.ds.append(dir(a))
     def rAdd (self, cod,p) : b=self.ds.pop(); a=self.ds.pop(); self.ds.append(a+b)
     def rSend(self, cod,p) : self.sendLine(self.ds.pop())
     def rMul (self, cod,p) : b=self.ds.pop(); a=self.ds.pop(); self.ds.append(a*b)
@@ -278,7 +279,6 @@ class Forth(basic.LineReceiver):
                     python_type = self.ds[-2]
                     args = self.ds[-1]
                     if word in dir(python_type):
-                        print "found python type method"
                         def do_object_method(cod, p):
                             args = self.ds.pop()
                             python_type = self.ds.pop()

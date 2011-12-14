@@ -25,6 +25,13 @@ class ForthRunner(TestCase):
 
 class ImprovedForth(ForthRunner):
 
+    def test_dir(self):
+        i = "'a' dir"
+        self._runforth(i)
+        self.assertTrue(isinstance(self.f.ds[0], list))
+        for a in ['find', 'index', 'isalpha']:
+            self.assertTrue(a in self.f.ds[0])
+
     def test_split(self):
         i = '"a b c d e" [] split'
         self._runforth(i)
