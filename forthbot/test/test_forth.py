@@ -40,6 +40,27 @@ class ImprovedForth(ForthRunner):
         self.assertTrue(c in self.sentLines, "%s did not contain %s" % (o, c))
 
 
+    def test_persist(self):
+        fp = FilePath(self.mktemp())
+        f = forth.Forth(saveFile=fp)
+        f.sendLine = self.f.sendLine
+        f.lineReceived(": question 99 1 + . ;")
+        f.lineReceived("question")
+        f.saveState()
+        self.f.saveFile = fp
+        self.f.loadState()
+        self.f.sendLine('foobar')
+        self._runforth("question")
+        self.assertTrue("100" in self.sentLines)
+
+    def test_get_state(self):
+        """
+        get_state returns everything but sendLine
+        """
+        v = self.f.__getstate__()
+        self.assertTrue('sendLine' not in v)
+
+
 class TestForth(TestCase):
     def setUp(self):
         self.f = forth.Forth()

@@ -4,10 +4,9 @@ from pyparsing import OneOrMore, Word, pythonStyleComment
 
 from twisted.protocols import basic
 from twisted.internet import stdio, reactor
+from twisted.python.filepath import FilePath
+import os
 
-
-WORD = 'I'
-PYVAL = 'P'
 
 class ForthWord(str):
     pass
@@ -36,7 +35,11 @@ class Forth(basic.LineReceiver):
 
     delimiter = '\n' # unix terminal style newlines. remove this line
 
-    def __init__(self):
+    saveFile = FilePath(os.environ['HOME']).child('.forthbot.sav')
+
+    def __init__(self, saveFile=None):
+        if saveFile is not None:
+            self.saveFile = saveFile 
         self.ds = []
         self.cStack   = []          # The control struct stack
         self.rStack   = []
@@ -55,11 +58,37 @@ class Forth(basic.LineReceiver):
         self.rDict = {
         '+'  : self.rAdd, '-'   : self.rSub, '/' : self.rDiv, '*'    : self.rMul,   'over': self.rOver,
         'dup': self.rDup, 'swap': self.rSwap, '.': self.rDot, 'dump' : self.rDump,  'drop': self.rDrop,
-        '='  : self.rEq,  '>'   : self.rGt,   '<': self.rLt,  's' : self.rSend,
+        '='  : self.rEq,  '>'   : self.rGt,   '<': self.rLt,  's' : self.rSend, 'load': self.rLoad,
+        'save': self.rSave,
         ','  : self.rComa,'@'   : self.rAt, '!'  : self.rBang,'allot': self.rAllot,
 
         'create': self.rCreate, 'does>': self.rDoes,
         }
+
+    def saveState(self):
+        import pickle
+        fh = self.saveFile.open(mode='w')
+        pickle.dump(self, fh, pickle.HIGHEST_PROTOCOL)
+        fh.close()
+
+    def loadState(self):
+        import pickle
+        import pprint
+        fh = self.saveFile.open()
+        n = pickle.load(fh)
+        fh.close()
+        n.sendLine = self.sendLine
+        self.__dict__.update(n.__dict__)
+  
+
+    def __getstate__(self):
+        v = self.__dict__.copy()
+        v.pop('sendLine')
+        return v
+
+
+    def rSave(self, cod,p) : self.saveState()
+    def rLoad(self, cod,p) : self.loadState()
 
     def rAdd (self, cod,p) : b=self.ds.pop(); a=self.ds.pop(); self.ds.append(a+b)
     def rSend(self, cod,p) : self.sendLine(self.ds.pop())
