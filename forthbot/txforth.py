@@ -59,7 +59,7 @@ class Forth(basic.LineReceiver):
         '+'  : self.rAdd, '-'   : self.rSub, '/' : self.rDiv, '*'    : self.rMul,   'over': self.rOver,
         'dup': self.rDup, 'swap': self.rSwap, '.': self.rDot, 'dump' : self.rDump,  'drop': self.rDrop,
         '='  : self.rEq,  '>'   : self.rGt,   '<': self.rLt,  's' : self.rSend, 'load': self.rLoad,
-        'save': self.rSave,
+        'save': self.rSave, 'input': self.rInput,
         ','  : self.rComa,'@'   : self.rAt, '!'  : self.rBang,'allot': self.rAllot,
 
         'create': self.rCreate, 'does>': self.rDoes,
@@ -131,6 +131,18 @@ class Forth(basic.LineReceiver):
             self._runPcode(pcode, p)
         return 'init'
 
+
+    def rInput(self, cod, p) : 
+        self.state = 'input'
+
+    def state_input(self, w):
+        self.ds.append(w)
+        while self.rStack:
+            pcode, p = self.rStack.pop()
+            #self.p = p
+            self._runPcode(pcode, p)
+ 
+        return 'init'
 
     def rDoes (self, cod,p) :
         self.rDict[self.lastCreate] += cod[p:]        # rest of words belong to created words runtime
@@ -259,7 +271,24 @@ class Forth(basic.LineReceiver):
     def _get_rAct(self, word):
         rAct = None
         try:
-            rAct = self.rDict.get(word)
+            rAct = self.rDict.get(word, None)
+            if rAct is None:
+                l = len(self.ds)
+                if l > 1:
+                    python_type = self.ds[-2]
+                    args = self.ds[-1]
+                    if word in dir(python_type):
+                        print "found python type method"
+                        def do_object_method(cod, p):
+                            args = self.ds.pop()
+                            python_type = self.ds.pop()
+                            m = getattr(python_type, word)
+                            res = m(*args)
+                            if res == None:
+                                self.ds.append(python_type)
+                            else:
+                                self.ds.append(res)
+                        rAct = do_object_method
         except Exception, e:
             print e
         return rAct
@@ -306,6 +335,9 @@ class Forth(basic.LineReceiver):
             if self.state == 'create':
                 self.rStack.append((pcode, p))
                 return 'create'
+            if self.state == 'input':
+                self.rStack.append((pcode, p))
+                return 'input'
         return 'init'
 
 

@@ -25,6 +25,19 @@ class ForthRunner(TestCase):
 
 class ImprovedForth(ForthRunner):
 
+    def test_split(self):
+        i = '"a b c d e" [] split'
+        self._runforth(i)
+        self.assertEquals(self.f.ds, [['a', 'b', 'c', 'd', 'e']])
+
+    def test_input(self):
+        i = ": test_input input 100 + ;"
+        self._runforth(i)
+        self.f.lineReceived('test_input')
+        self.assertTrue('...    ' in self.sentLines)
+        self.f.lineReceived('99')
+        self.assertEquals(self.f.ds, [199])
+
     def test_append_strings(self):
         i = '"abc" "def" + .'
         c = 'abcdef'
