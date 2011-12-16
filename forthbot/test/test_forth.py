@@ -45,6 +45,16 @@ class ImprovedForth(ForthRunner):
         self.f.lineReceived('99')
         self.assertEquals(self.f.ds, [199])
 
+    def test_input_twice(self):
+        i = ": test_input input input + ;"
+        self._runforth(i)
+        self.f.lineReceived('test_input')
+        self.assertTrue('...    ' in self.sentLines)
+        self.f.lineReceived('99')
+        self.f.lineReceived('1')
+        self.assertEquals(self.f.ds, [100])
+
+
     def test_append_strings(self):
         i = '"abc" "def" + .'
         c = 'abcdef'

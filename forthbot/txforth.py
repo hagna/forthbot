@@ -6,7 +6,7 @@ from twisted.protocols import basic
 from twisted.internet import stdio, reactor
 from twisted.python.filepath import FilePath
 import os
-
+from pprint import pprint
 
 class ForthWord(str):
     pass
@@ -73,7 +73,6 @@ class Forth(basic.LineReceiver):
 
     def loadState(self):
         import pickle
-        import pprint
         fh = self.saveFile.open()
         n = pickle.load(fh)
         fh.close()
@@ -123,6 +122,7 @@ class Forth(basic.LineReceiver):
     def rCreate (self, pcode,p) :
         self.state = 'create'
 
+
     def state_create(self, label):
         self.lastCreate = label       # match next word (input) to next heap address
         self.rDict[label] = [self.rPush, self.heapNext]    # when created word is run, pushes its address
@@ -137,12 +137,14 @@ class Forth(basic.LineReceiver):
         self.state = 'input'
 
     def state_input(self, w):
+        self.state = 'init'
         self.ds.append(w)
         while self.rStack:
             pcode, p = self.rStack.pop()
             #self.p = p
-            self._runPcode(pcode, p)
- 
+            res = self._runPcode(pcode, p)
+            if res != 'init':
+                return res
         return 'init'
 
     def rDoes (self, cod,p) :
