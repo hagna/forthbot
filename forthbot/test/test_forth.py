@@ -70,18 +70,48 @@ class ImprovedForth(ForthRunner):
         self.assertTrue(c in self.sentLines, "%s did not contain %s" % (o, c))
 
 
+
+    def test_call2name(self):
+        """
+        changes methods to the names of those methods
+        """
+        f = forth.Forth()
+        f.lineReceived(": question 99 1 + . ;")
+        res = f.call2name(f.rDict)
+        self.assertEquals(res['does>'], 'rDoes')
+        self.assertEquals(res['save'], 'rSave')
+        self.assertEquals(res['question'], ['rPush', 99, 'rPush', 1, 'rAdd', 'rDot'])
+
+
+    def test_name2call(self):
+        """
+        Does the opposite of above.
+        """
+        f = forth.Forth()
+        res = f.name2call({'question': ['rPush', 99, 'rPush', 1, 'rAdd', 'rDot'],
+            'push': 'rPush'})
+        self.assertFalse('push' in f.rDict.keys())
+        self.assertEquals(res['push'], f.rPush)
+        self.assertEquals(res['question'], [f.rPush, 99, f.rPush, 1, f.rAdd, f.rDot])
+
     def test_persist(self):
+        """
+        saveState saves the state of the heap and the rDict
+        """
         fp = FilePath(self.mktemp())
         f = forth.Forth(saveFile=fp)
         f.sendLine = self.f.sendLine
         f.lineReceived(": question 99 1 + . ;")
         f.lineReceived("question")
+        f.lineReceived("create v1 1 allot")
+        f.lineReceived("101 v1 !")
         f.saveState()
         self.f.saveFile = fp
         self.f.loadState()
-        self.f.sendLine('foobar')
         self._runforth("question")
         self.assertTrue("100" in self.sentLines)
+        self.f.lineReceived('v1 @')
+        self.assertEquals(self.f.ds, [101])
 
     def test_get_state(self):
         """

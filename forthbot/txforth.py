@@ -8,6 +8,12 @@ from twisted.python.filepath import FilePath
 import os
 from pprint import pprint
 
+try:
+    import json
+except:
+    import simplejson as json
+
+
 class ForthWord(str):
     pass
 
@@ -66,18 +72,17 @@ class Forth(basic.LineReceiver):
         }
 
     def saveState(self):
-        import pickle
-        fh = self.saveFile.open(mode='w')
-        pickle.dump(self, fh, pickle.HIGHEST_PROTOCOL)
-        fh.close()
+        rdict = self.call2name(self.rDict)
+        heap = self.heap
+        all = json.dumps({'rdict':rdict, 'heap':heap})
+        self.saveFile.setContent(all)
 
     def loadState(self):
-        import pickle
-        fh = self.saveFile.open()
-        n = pickle.load(fh)
-        fh.close()
-        n.sendLine = self.sendLine
-        self.__dict__.update(n.__dict__)
+        res = json.loads(self.saveFile.getContent())
+        rdict = res['rdict']
+        heap = res['heap']
+        self.rDict.update(self.name2call(rdict))
+        self.heap = heap
   
 
     def __getstate__(self):
@@ -350,37 +355,40 @@ class Forth(basic.LineReceiver):
         if newP != None: p = newP
         return p
 
-
-    def _intlike(self, a):
-        try:
-            int(a)
-            return True
-        except:
-            return False
-
-    def _floatlike(self, a):
-        if self._intlike(a):
-            return False
-        try:
-            float(a)
-            return True
-        except:
-            return False
-
-    def fix_type(self, word):
-        # Number to be pushed onto ds at runtime
-        if self._intlike(word):
-            return int(word)
-        if self._floatlike(word):
-            return float(word)
-        if isinstance(word, list) or isinstance(word, dict):
-            return word
-        if word[0] in ["'", '"']:
-            return word
-        return None
+    def call2name(self, d):
+        """
+        given a dictionary like rDict of name method call values converts those to strings.
+        """
+        res = {}
+        for k, v in d.iteritems():
+            if isinstance(v, list):
+                res[k] = []
+                for i in v:
+                    if hasattr(i, '__call__'):
+                        res[k].append(i.func_name)
+                    else:
+                        res[k].append(i)
+            else:
+                res[k] = v.func_name
+        return res
 
 
+    def name2call(self, d):
+        res = {}
+        for k, v in d.iteritems():
+            if isinstance(v, list):
+                res[k] = []
+                for i in v:
+                    if isinstance(i, str) and hasattr(self, i):
+                        res[k].append(getattr(self, i))
+                    else:
+                        res[k].append(i)
+            else:
+                res[k] = getattr(self, v)
+        return res
+                 
 
+    
 
 if __name__ == "__main__":
     stdio.StandardIO(Forth())
